@@ -272,7 +272,12 @@ export function EntryPortal() {
                     alt="Google" 
                     className="w-5 h-5" 
                   />
-                  Continue with Google
+                  <span>
+                  Continue with Google {' '}
+                  <span className="font-normal text-gray-400 text-sm">
+                      (Only for Company)
+                  </span>
+                  </span>
                 </Button>
 
             <Typography

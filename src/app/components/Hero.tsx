@@ -68,7 +68,12 @@ export function Hero({ onRegisterTeacher, onRegisterCompany }: HeroProps) {
               alt="Google" 
               className="w-5 h-5" 
             />
-            Register with Google
+            <span>
+            Register with Google{' '}
+            <span className="font-normal text-gray-400 text-sm">
+                (Only for Company)
+            </span>
+            </span>
           </button>
           
           <p className="text-xs text-gray-400 mt-3 text-center">
