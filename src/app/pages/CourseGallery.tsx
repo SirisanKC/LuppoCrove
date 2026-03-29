@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "../services/supabaseClient";
 import { useNavigate } from "react-router";
 import {
   Plus,
@@ -13,6 +14,14 @@ import {
 } from "lucide-react";
 import { TeacherNav } from "../components/TeacherNav";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+
+interface DbCourse {
+  id: string;
+  title: string;
+  course_code: string | null;
+  semester: string | null;
+  created_at: string;
+}
 
 interface ProjectProposal {
   id: string;
@@ -121,10 +130,40 @@ export function CourseGallery() {
   const [savedProposalIds, setSavedProposalIds] = useState<Set<string>>(new Set(["proj-1", "proj-3"])); // demo: 2 pre-saved
   const [showShortlist, setShowShortlist] = useState(false);
   const [showPastCourses, setShowPastCourses] = useState(false);
+  const [dbCourses, setDbCourses] = useState<DbCourse[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
+  console.log("CourseGallery component loaded");
   const filteredProposals = activeProposalFilter
     ? projectProposals.filter((p) => p.topic === activeProposalFilter)
     : projectProposals;
+
+useEffect(() => {
+  const fetchCourses = async () => {
+    console.log("fetchCourses started");
+    setLoadingCourses(true);
+
+    const { data, error } = await supabase
+      .from("courses")
+      .select("id, title, course_code, semester, created_at")
+      .order("created_at", { ascending: false });
+
+    console.log("COURSES FROM DB:", data);
+    console.log("COURSES ERROR:", error);
+
+    if (error) {
+      console.error("Error fetching courses:", error);
+      setDbCourses([]);
+    } else {
+      setDbCourses(data || []);
+    }
+
+    setLoadingCourses(false);
+    console.log("fetchCourses finished");
+  };
+
+  fetchCourses();
+}, []);
 
   const savedProposals = projectProposals.filter((p) => savedProposalIds.has(p.id));
 
@@ -182,149 +221,90 @@ export function CourseGallery() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Active Course Card — CT60A9800 */}
-            <div
-              onClick={() => navigate("/teacher/courses/CT60A9800/proposals")}
-              className="bg-white overflow-hidden group"
-              style={{
-                borderRadius: 16,
-                border: "1px solid rgba(0,0,0,0.05)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                padding: 24,
-                cursor: "pointer",
-                transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s ease",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-                (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
-              }}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111827", margin: 0, marginBottom: 4 }}>
-                    CT60A9800 Capstone Project
-                  </h3>
-                  <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>Fall 2026</p>
-                </div>
-                <div
-                  className="flex items-center gap-2"
-                  style={{
-                    padding: "4px 12px",
-                    borderRadius: 999,
-                    backgroundColor: "rgba(45,90,71,0.1)",
-                    color: "#2d5a47",
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  <Inbox className="w-3 h-3" />
-                  <span>7 New</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-4" style={{ fontSize: 13, color: "#6b7280" }}>
-                <div className="flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
-                  <span>12 Approved</span>
-                </div>
-                <div>
-                  <span>45 Students Enrolled</span>
-                </div>
-              </div>
-            </div>
+  {loadingCourses ? (
+    <div
+      className="bg-white"
+      style={{
+        borderRadius: 16,
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        padding: 24,
+      }}
+    >
+      <p style={{ fontSize: 14, color: "#6b7280", margin: 0 }}>Loading courses...</p>
+    </div>
+  ) : dbCourses.length === 0 ? (
+    <div
+      className="bg-white"
+      style={{
+        borderRadius: 16,
+        border: "1px solid rgba(0,0,0,0.05)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+        padding: 24,
+      }}
+    >
+      <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111827", margin: 0, marginBottom: 8 }}>
+        No courses yet
+      </h3>
+      <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>
+        Click “Add New Course” to create your first course.
+      </p>
+    </div>
+  ) : (
+    dbCourses.map((dbCourse) => (
+      <div
+        key={dbCourse.id}
+        onClick={() => navigate(`/teacher/courses/${dbCourse.id}/proposals`)}
+        className="bg-white overflow-hidden group"
+        style={{
+          borderRadius: 16,
+          border: "1px solid rgba(0,0,0,0.05)",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+          padding: 24,
+          cursor: "pointer",
+          transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s ease",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
+          (e.currentTarget as HTMLElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.06)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
+          (e.currentTarget as HTMLElement).style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
+        }}
+      >
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#111827", margin: 0, marginBottom: 4 }}>
+              {(dbCourse.course_code || "NO-CODE")} {dbCourse.title}
+            </h3>
+            <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>
+              {dbCourse.semester || "No semester"}
+            </p>
+          </div>
+          <div
+            className="flex items-center gap-2"
+            style={{
+              padding: "4px 12px",
+              borderRadius: 999,
+              backgroundColor: "rgba(45,90,71,0.1)",
+              color: "#2d5a47",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            <span>Published</span>
+          </div>
+        </div>
 
-            {/* Past Courses — Expandable */}
-            <div
-              className="bg-white overflow-hidden lg:col-span-2"
-              style={{
-                borderRadius: 16,
-                border: "1px solid rgba(0,0,0,0.05)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                padding: 0,
-              }}
-            >
-              {/* Past Courses Header */}
-              <button
-                onClick={() => setShowPastCourses(!showPastCourses)}
-                className="w-full flex items-center justify-between transition-colors hover:bg-gray-50"
-                style={{
-                  padding: "18px 24px",
-                  border: "none",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex items-center justify-center rounded-lg"
-                    style={{ width: 32, height: 32, backgroundColor: "#f3f4f6" }}
-                  >
-                    <Lock size={14} color="#9ca3af" />
-                  </div>
-                  <div className="text-left">
-                    <p style={{ fontSize: 15, fontWeight: 600, color: "#374151", margin: 0 }}>
-                      Past Courses
-                    </p>
-                    <p style={{ fontSize: 12, color: "#9ca3af", margin: 0, marginTop: 2 }}>
-                      {PAST_COURSES.length} archived courses (read-only)
-                    </p>
-                  </div>
-                </div>
-                <ChevronDown
-                  size={18}
-                  color="#9ca3af"
-                  className="transition-transform"
-                  style={{ transform: showPastCourses ? "rotate(180deg)" : "none" }}
-                />
-              </button>
-
-              {/* Expandable Past Courses List */}
-              {showPastCourses && (
-                <div style={{ borderTop: "1px solid #f3f4f6" }}>
-                  {PAST_COURSES.map((pc, idx) => (
-                    <div
-                      key={pc.id}
-                      onClick={() => navigate(`/teacher/courses/${pc.code}/proposals`)}
-                      className="flex items-center justify-between transition-colors hover:bg-gray-50 cursor-pointer"
-                      style={{
-                        padding: "14px 24px",
-                        borderBottom: idx < PAST_COURSES.length - 1 ? "1px solid #f3f4f6" : "none",
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Eye size={14} color="#9ca3af" />
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 500, color: "#374151", margin: 0 }}>
-                            {pc.semester}: {pc.title}
-                          </p>
-                          <p style={{ fontSize: 12, color: "#9ca3af", margin: 0, marginTop: 1 }}>
-                            {pc.code} &bull; {pc.approved} approved &bull; {pc.students} students
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          style={{
-                            padding: "3px 8px",
-                            borderRadius: 6,
-                            fontSize: 10,
-                            fontWeight: 600,
-                            backgroundColor: "#f3f4f6",
-                            color: "#9ca3af",
-                          }}
-                        >
-                          Read-Only
-                        </span>
-                        <ChevronRight size={14} color="#d1d5db" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        <div className="flex items-center gap-4" style={{ fontSize: 13, color: "#6b7280" }}>
+          <div>
+            <span>Created: {new Date(dbCourse.created_at).toLocaleDateString()}</span>
+          </div>
+        </div>
+      </div>
+    ))
+  )}
           </div>
         </div>
 

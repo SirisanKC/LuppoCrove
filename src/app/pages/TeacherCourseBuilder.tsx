@@ -1,3 +1,5 @@
+import { supabase } from "../services/supabaseClient";
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -454,15 +456,100 @@ export function TeacherCourseBuilder() {
     }
   };
 
-  const handlePublish = () => {
-    const payload = {
-      course,
-      milestones: milestones.filter((m) => m.name.trim()),
-      templateFields,
-    };
-    console.log("Publishing course payload (Supabase-ready):", JSON.stringify(payload, null, 2));
-    alert("Course published successfully!");
-    navigate("/teacher");
+  const handlePublish = async () => {
+    try {
+      if (!course.title.trim()) {
+        alert("Please enter a course title.");
+        return;
+      }
+
+      const validMilestones = milestones.filter((m) => m.name.trim());
+      const validTemplateFields = templateFields.filter((f) => f.label.trim());
+
+      // Optional: get current logged in user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      // 1. Insert main course
+      const { data: insertedCourse, error: courseError } = await supabase
+        .from("courses")
+        .insert([
+          {
+            teacher_id: user?.id ?? null,
+            title: course.title,
+            course_code: course.courseCode || null,
+            semester: course.semester || null,
+            start_date: course.startDate || null,
+            end_date: course.endDate || null,
+            proposal_deadline: course.proposalDeadline || null,
+            description: course.description || null,
+            pasted_from_url: course.pastedFromUrl,
+          },
+        ])
+        .select()
+        .single();
+
+      if (courseError) {
+        console.error("Course insert error:", courseError);
+        alert("Failed to save course in database.");
+        return;
+      }
+
+      const courseId = insertedCourse.id;
+
+      // 2. Insert milestones
+      if (validMilestones.length > 0) {
+        const { error: milestoneError } = await supabase
+          .from("course_milestones")
+          .insert(
+            validMilestones.map((m) => ({
+              course_id: courseId,
+              name: m.name,
+              date: m.date || null,
+              requires_upload: m.requiresUpload,
+            }))
+          );
+
+        if (milestoneError) {
+          console.error("Milestone insert error:", milestoneError);
+          alert("Course saved, but milestones failed to save.");
+          return;
+        }
+      }
+
+      // 3. Insert template fields
+      if (validTemplateFields.length > 0) {
+        const { error: templateError } = await supabase
+          .from("course_template_fields")
+          .insert(
+            validTemplateFields.map((f) => ({
+              course_id: courseId,
+              label: f.label,
+              field_type: f.fieldType,
+              required: f.required,
+              character_limit: f.hasCharacterLimit ? f.characterLimit || null : null,
+              has_character_limit: f.hasCharacterLimit,
+              placeholder: f.placeholder || null,
+              dropdown_options: f.dropdownOptions || [],
+              accepted_file_types: f.acceptedFileTypes || [],
+              max_file_size_mb: f.maxFileSizeMB || 10,
+            }))
+          );
+
+        if (templateError) {
+          console.error("Template insert error:", templateError);
+          alert("Course saved, but template fields failed to save.");
+          return;
+        }
+      }
+
+      alert("Course published successfully!");
+      navigate("/teacher");
+    } catch (error) {
+      console.error("Publish error:", error);
+      alert("Something went wrong while publishing.");
+    }
   };
 
   const fieldTypeLabel = (t: TemplateField["fieldType"]) =>
